@@ -1,0 +1,2 @@
+polak <-"stas"
+print(polak)
