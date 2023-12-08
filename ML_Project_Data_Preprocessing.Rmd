@@ -19,11 +19,12 @@ knitr::opts_chunk$set(echo = TRUE)
 2) data exploration:
   - pipeline
   - watch out for bias
-3) Choose assessment metrics:   
-  - Firstly: we care about Area Under the Curve
-  - Second: Sensitivity to make sure that classrooms are not overcrowded
-  - Third: Specificity to make sure that classrooms are not empty 
-
+3) Choose assessment metrics:
+  - 1) Accuracy; but collect Sens and Spec.  
+  BACKUP:
+  - Firstly: Sensitivity to make sure that classrooms are not overcrowded
+  - Secondly: Specificity to make sure that classrooms are not empty 
+  - Thirdly: we care about Area Under the Curve to compare the prediction performace 
 ## Splitting data:
 
 Load packages:
