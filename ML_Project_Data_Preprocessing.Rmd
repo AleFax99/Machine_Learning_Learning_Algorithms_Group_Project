@@ -1,0 +1,130 @@
+---
+title: "Data preprocessing"
+output: html_document
+date: "2023-12-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data preprocessing 
+
+## Checklist:
+
+1) Split the data: 
+  - Take the full-year enrollments for the training: Option 2 for censoring
+  - Assessment: before March 15th 
+  - Downsample to ensure that enrolled = not enrolled
+2) data exploration:
+  - pipeline
+  - watch out for bias
+3) Choose assessment metrics:   
+  - Firstly: we care about Area Under the Curve
+  - Second: Sensitivity to make sure that classrooms are not overcrowded
+  - Third: Specificity to make sure that classrooms are not empty 
+
+## Splitting data:
+
+Load packages:
+```{r}
+library(tidymodels)
+library(tidyverse)
+library(skimr)
+library(corrplot)
+library(GGally)
+```
+
+Loading the data:
+```{r}
+load("offers_censored.RData")
+source("./helpful_functions.R")
+```
+
+```{r}
+ years_and_max_dates <- function(x) {
+  x |>
+    group_by(AppYear) |>
+    summarise(
+      `Num observations` = n(),
+      `Max \`AppDate\`` = max(AppDate),
+      `Max \`OfferDate\`` = max(OfferDate),
+      `Max \`ResponseDate\`` = max(ResponseDate, na.rm = TRUE),
+      `\`ResponseDate\` is NA` = sum(is.na(ResponseDate))
+    )
+}
+```
+
+
+Making the splits according to Cesnoring 2 chosen:
+
+```{r}
+final_training_prediction_split <-
+  offers |>
+  filter(AppYear >= 2021) |>
+  make_appyear_split(test_year = 2023)
+
+
+```
+
+The table below confirms that the final training set includes only data from 2021 and 2022, with no censoring:
+
+```{r}
+training(final_training_prediction_split) |> years_and_max_dates()
+```
+Next, create the analysis/assessment split:
+
+```{r}
+analysis_assessment_split <-
+  offers |>
+  # do not include 2020 in the analysis
+  filter(AppYear >= 2021 & AppYear <= 2022) |>
+  censor_post_prediction_responses(years = 2022) |>
+  drop_post_prediction_offers(years = 2022) |>
+  make_appyear_split(test_year = 2022)
+
+```
+
+The table below confirms that the analysis set includes only data from AY2021, and in each year, only contains information available before March 15.
+
+```{r}
+RSM_train <- training(analysis_assessment_split)
+training(analysis_assessment_split) |> years_and_max_dates()
+```
+```{r}
+RSM_test <- testing(analysis_assessment_split)
+testing(analysis_assessment_split) |> years_and_max_dates()
+
+```
+## Preparing data for 5-fold CV:
+
+```{r}
+set.seed(616115436) # Call me xoxo
+
+cv_folds <- vfold_cv(RSM_train, v = 5)
+cv_folds
+
+```
+
+## Data exploration:
+
+Here we provide the useful data exploration, however due to choosing CV, we cannot perform feature selection due to risk of introducing bias.
+
+```{r}
+RSM_train |>
+  skimr::skim()
+
+```
+
+```{r}
+RSM_train %>% 
+  ggpairs(cardinality_threshold = 42)
+  
+```
+
+```{r}
+
+
+```
+
+
