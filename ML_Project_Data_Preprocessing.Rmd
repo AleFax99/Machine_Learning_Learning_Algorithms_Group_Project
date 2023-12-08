@@ -33,6 +33,7 @@ library(tidyverse)
 library(skimr)
 library(corrplot)
 library(GGally)
+library(ggplot2)
 ```
 
 Loading the data:
@@ -96,35 +97,77 @@ RSM_test <- testing(analysis_assessment_split)
 testing(analysis_assessment_split) |> years_and_max_dates()
 
 ```
+Checking for class imbalance: There is slight class imbalance present, however there are enough observations for the algorithms to be able to distinguish between the two classes. 
+
+```{r}
+RSM_train %>% 
+  count(Status) %>% 
+  mutate(prop = n / sum(n))
+
+
+```
+
+
 ## Preparing data for 5-fold CV:
 
 ```{r}
 set.seed(616115436) # Call me xoxo
 
-cv_folds <- vfold_cv(RSM_train, v = 5)
+cv_folds <- vfold_cv(RSM_train, v = 5, strata = Status)
 cv_folds
+cv_folds$splits[[1]]
 
 ```
 
 ## Data exploration:
 
 Here we provide the useful data exploration, however due to choosing CV, we cannot perform feature selection due to risk of introducing bias.
+There are no missing values, except for the ResponseDate variable, which makes sense, as some of the students applying may not have inserted a response at all. 
 
 ```{r}
 RSM_train |>
   skimr::skim()
 
 ```
-
+Here we can see that all programmes have more "Enrolled" students than not enrolled, except for MiM master. 
 ```{r}
 RSM_train %>% 
-  ggpairs(cardinality_threshold = 42)
+  ggplot() + aes(Program) +
+  geom_bar(aes(fill = Status), position = "dodge")
+  
+```
+
+Is seems that almost all of the students who have indicated to Accept the offer, indeed enrolled at RSM. Only ~4% who accepted did not enroll. 
+```{r}
+RSM_train %>% 
+  ggplot() + aes(Response) +
+  geom_bar(aes(fill = Status), position = "dodge")
   
 ```
 
 ```{r}
+RSM_train %>% 
+  filter(Response == "Accepted") %>% 
+  group_by(Status) %>% 
+  count()
 
+89 / (1955 + 89)
+```
+
+Demo3 variable: 
+```{r}
+RSM_train %>% 
+  ggplot() + aes(Demo3) +
+  geom_bar(aes(fill = Status), position = "dodge")
 
 ```
+
+The distribution of the applicaton date is irregular. It seems that the enrlollment patterns come in three waves. 
+```{r}
+RSM_train %>% 
+  ggplot() + aes(AppDate) +
+  geom_histogram(aes(fill = Status)) 
+```
+
 
 
