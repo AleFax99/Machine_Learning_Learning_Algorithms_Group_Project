@@ -4,13 +4,78 @@ output: html_document
 date: "2023-12-09"
 ---
 
+# Random forest model 
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+Loading libraries:
+
 ```{r}
+# install.packages("ranger")
+library(ranger)
+```
+
+
+## Preprocessing recipe
+
+
+```{r}
+rf_recipe <- RSM_train %>% 
+  filter()
+  recipe(Status ~. , data = RSM_train)
+
+rf_recipe
+```
+
+Tuning:
+```{r}
+rf_tune <- rand_forest(mtry = tune(), trees = 1000) |>
+  set_mode("classification") |>
+  set_engine("ranger", importance = "permutation")
+
+rf_tune
+```
+
+Setting up the workflow:
+```{r}
+rf_tune_wf <-
+  workflow() |>
+  add_recipe(rf_recipe) |>
+  add_model(rf_tune)
+rf_tune_wf
+
+```
+## Defining the metrics for the model. 
+
+```{r}
+class_metrics <- metric_set(
+  accuracy, sensitivity,
+  specificity, roc_auc, kap
+)
+```
+
+```{r}
+rf_tune_grid <- grid_regular(mtry(range = c(1, 17)), levels = 17)
 
 ```
 
+Speeding up the computation
+```{r}
+num_cores <- parallel::detectCores()
+num_cores
+# doParallel::registerDoParallel(cores = num_cores - 1L)
+
+```
+```{r}
+set.seed(4433553)
+rf_tune_res <- tune_grid(
+  rf_tune_wf,
+  resamples = cv_folds,
+  grid = rf_tune_grid,
+  metrics = class_metrics
+)
+```
 
 
