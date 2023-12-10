@@ -24,7 +24,7 @@ library(ranger)
 ```{r}
 rf_recipe <- RSM_train %>% 
   recipe(Status ~. , data = RSM_train) %>% 
-  update_role(new_role = "metadata")
+  update_role(AppDate, new_role = "metadata")
 
 rf_recipe
 ```
