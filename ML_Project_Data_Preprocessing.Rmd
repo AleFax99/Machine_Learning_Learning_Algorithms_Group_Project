@@ -43,6 +43,16 @@ load("offers_censored.RData")
 source("./helpful_functions.R")
 ```
 
+1. Create AppMonth from AppDate
+```{r}
+offers <- offers |>
+  mutate(AppMonth = as.factor(month(AppDate, label=TRUE, abbr=FALSE)))
+str(offers)
+```
+
+2. In recipe for every model: Set AppYear, AppDate, OfferDate, Responsedate to Metadata
+
+
 ```{r}
  years_and_max_dates <- function(x) {
   x |>
