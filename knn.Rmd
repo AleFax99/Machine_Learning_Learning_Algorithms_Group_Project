@@ -1,0 +1,93 @@
+---
+title: "knn"
+output: html_document
+date: "2023-12-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+knn_class_model <- 
+  nearest_neighbor(neighbors = tune()) |>  
+  set_mode("classification") |>                
+  set_engine("kknn")  
+
+
+
+knn_class_recipe <- 
+  recipe(Status ~ ., data = RSM_train) |>
+  update_role(AppYear, AppDate, OfferDate, ResponseDate ,new_role = "metadata" ) |>
+  step_dummy(all_factor_predictors()) 
+
+
+knn_class_workflow <-
+  workflow() |> 
+  add_model(knn_class_model) |> 
+  add_recipe(knn_class_recipe)
+knn_class_workflow
+```
+
+```{r}
+knn_class_recipe_prepped <- 
+  knn_class_recipe |> 
+  prep(RSM_train)
+knn_class_recipe_prepped
+
+RSM_train_baked <- 
+  knn_class_recipe_prepped |> 
+  bake(RSM_train)
+```
+
+
+```{r}
+knn_class_tune_grid<-grid_regular(neighbors(range = c(5, 13)), 
+             levels = 5)
+
+knn_class_tune_results <- 
+  knn_class_workflow %>%
+  tune_grid(resamples = cv_folds,
+            grid = knn_class_tune_grid,
+            metrics = metric_set(accuracy,sensitivity,specificity))
+
+
+knn_class_tune_metrics <- 
+  knn_class_tune_results |> 
+  collect_metrics()
+knn_class_tune_metrics
+
+
+knn_class_tune_results |> 
+  autoplot() +
+  theme_bw()
+
+```
+
+```{r}
+knn_1se_model <- 
+  knn_class_tune_results |> 
+  select_by_one_std_err(metric = "accuracy", neighbors)
+knn_1se_model
+```
+
+7 neighbors
+```{r}
+knn_class_workflow_final <- 
+  knn_class_workflow |> 
+  finalize_workflow(knn_1se_model)
+
+knn_class_workflow_final |> 
+  fit(data = RSM_train)
+
+knn_class_last_fit <- 
+  knn_class_workflow_final |> 
+  last_fit(analysis_assessment_split, 
+           metrics = metric_set(accuracy,sensitivity,specificity))
+
+knn_class_metrics <- 
+  knn_class_last_fit |> 
+  collect_metrics()
+knn_class_metrics
+```
