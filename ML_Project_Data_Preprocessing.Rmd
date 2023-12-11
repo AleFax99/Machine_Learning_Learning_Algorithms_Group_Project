@@ -54,12 +54,8 @@ source("./helpful_functions.R")
       `Max \`ResponseDate\`` = max(ResponseDate, na.rm = TRUE),
       `\`ResponseDate\` is NA` = sum(is.na(ResponseDate))
     )
-<<<<<<< HEAD
  }
-#lol
-=======
-}
->>>>>>> main
+
 ```
 
 
@@ -175,10 +171,5 @@ RSM_train %>%
   geom_histogram(aes(fill = Status)) 
 ```
 
-<<<<<<< HEAD
 
-
-=======
-lol
->>>>>>> main
 
