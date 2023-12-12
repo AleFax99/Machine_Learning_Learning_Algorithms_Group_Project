@@ -24,7 +24,7 @@ library(ranger)
 ```{r}
 rf_recipe <- RSM_train %>% 
   recipe(Status ~. , data = RSM_train) %>% 
-  update_role(AppDate, new_role = "metadata")
+  update_role(AppDate, AppYear, OfferDate, ResponseDate, new_role = "metadata")
 
 rf_recipe
 ```
@@ -57,17 +57,11 @@ class_metrics <- metric_set(
 ```
 
 ```{r}
-rf_tune_grid <- grid_regular(mtry(range = c(1, 17)), levels = 17)
+rf_tune_grid <- grid_regular(mtry(range = c(1, 14)), levels = 14)
 
 ```
 
-Speeding up the computation
-```{r}
-num_cores <- parallel::detectCores()
-num_cores
-# doParallel::registerDoParallel(cores = num_cores - 1L)
 
-```
 ```{r}
 set.seed(4433553)
 rf_tune_res <- tune_grid(
@@ -77,5 +71,61 @@ rf_tune_res <- tune_grid(
   metrics = class_metrics
 )
 ```
+
+Collecting the metrics:
+```{r}
+rf_metrics <-
+  rf_tune_res |>
+  collect_metrics()
+rf_metrics
+```
+
+
+Plotting the results of the metrics:
+```{r}
+rf_tune_res |>
+  collect_metrics() |>
+  filter(.metric %in% c("accuracy", "roc_auc")) |>
+  ggplot(aes(
+    x = mtry, y = mean, ymin = mean - std_err,
+    ymax = mean + std_err,
+    colour = .metric
+  )) +
+  geom_errorbar() +
+  geom_line() +
+  geom_point() +
+  scale_colour_manual(values = c("#D55E00", "#0072B2")) +
+  facet_wrap(~.metric, ncol = 1, scales = "free_y") +
+  guides(colour = "none") +
+  theme_bw()
+```
+
+```{r}
+rf_tune_res |>
+  collect_metrics() |>
+  filter(.metric %in% c("sensitivity", "specificity")) |>
+  ggplot(aes(
+    x = mtry, y = mean, ymin = mean - std_err,
+    ymax = mean + std_err,
+    colour = .metric
+  )) +
+  geom_errorbar() +
+  geom_line() +
+  geom_point() +
+  scale_colour_manual(values = c("black", "green")) +
+  facet_wrap(~.metric, ncol = 1, scales = "free_y") +
+  guides(colour = "none") +
+  theme_bw()
+```
+As specified in the data pre-processing part, we care most about accuracy of the model. However, we decided to plot sensitivity, specificity and area under the curve in order to make sure we don't overly sacrifice one metric to achieve higher performance in the other. Looking at the graphs, accuracy seems to be maximised for the values between 2 and 7. At mtry = 1, Sensitivity reaches its maximum, whereas specificity is at its minimum. To correct for that, choosing values between 2 and 7 allows us to sacrifice a bit of sensitivity to achieve better specificity. For the low values of mtry, we also achieve high values of area under the curve. 
+
+Choosing the best model according to the 1SE rule - here the lower number of mtry suggests a simpler model, since the algorithm has to consider less variables at each split. 
+```{r}
+best_rf <- select_by_one_std_err(rf_tune_res, metric = "accuracy", mtry)
+best_rf
+```
+Accuracy with mtry of 2 seems to confirm our previous reasoning, where at the same time we are able to achieve both high sensitivity and specificity, as well as reasonable area under the curve measure. 
+
+Finalising the workflow:
 
 
