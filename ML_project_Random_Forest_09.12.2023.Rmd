@@ -119,13 +119,33 @@ rf_tune_res |>
 ```
 As specified in the data pre-processing part, we care most about accuracy of the model. However, we decided to plot sensitivity, specificity and area under the curve in order to make sure we don't overly sacrifice one metric to achieve higher performance in the other. Looking at the graphs, accuracy seems to be maximised for the values between 2 and 7. At mtry = 1, Sensitivity reaches its maximum, whereas specificity is at its minimum. To correct for that, choosing values between 2 and 7 allows us to sacrifice a bit of sensitivity to achieve better specificity. For the low values of mtry, we also achieve high values of area under the curve. 
 
-Choosing the best model according to the 1SE rule - here the lower number of mtry suggests a simpler model, since the algorithm has to consider less variables at each split. 
+Choosing the best model according to the 1SE rule - here the lower number of mtry suggests a simpler model, since the algorithm has to consider less variables at each split. Choosing a lower mtry also lowers the risk of overfitting. Given consistent high metric values over the range 2-7, choosing 2 seems like a reasonable choice. 
 ```{r}
 best_rf <- select_by_one_std_err(rf_tune_res, metric = "accuracy", mtry)
 best_rf
 ```
 Accuracy with mtry of 2 seems to confirm our previous reasoning, where at the same time we are able to achieve both high sensitivity and specificity, as well as reasonable area under the curve measure. 
 
-Finalising the workflow:
+Finalizing the workflow:
+```{r}
+rf_final_wf <- finalize_workflow(rf_tune_wf, best_rf)
+rf_final_wf
+```
+## Test set performance on 2023 data
+
+```{r}
+set.seed(34662947) #Call me 
+rf_final_fit <- 
+  rf_final_wf %>% 
+  last_fit(analysis_assessment_split, metrics = class_metrics)
+  
+```
+
+Collecting metrics:
+```{r}
+rf_final_fit %>% 
+  collect_metrics()
+```
+The model that was chosen, has an accuracy score of 96.1%, slightly lower than the training estimation (97.0%). Moreover, The model performs worse than expected in terms of sensitivity, and better than expected for specificity. The area under the curve achieves a comparable value to the one in training.   
 
 
