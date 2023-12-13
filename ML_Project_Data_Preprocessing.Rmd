@@ -1,0 +1,184 @@
+---
+title: "Data preprocessing"
+output: html_document
+date: "2023-12-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data preprocessing 
+
+## Checklist:
+
+1) Split the data: 
+  - Take the full-year enrollments for the training: Option 2 for censoring
+  - Assessment: before March 15th 
+  - Downsample to ensure that enrolled = not enrolled
+2) data exploration:
+  - pipeline
+  - watch out for bias
+3) Choose assessment metrics:
+  - 1) Accuracy; but collect Sens and Spec.  
+  BACKUP:
+  - Firstly: Sensitivity to make sure that classrooms are not overcrowded
+  - Secondly: Specificity to make sure that classrooms are not empty 
+  - Thirdly: we care about Area Under the Curve to compare the prediction performace 
+## Splitting data:
+
+Load packages:
+```{r}
+library(tidymodels)
+library(tidyverse)
+library(skimr)
+library(corrplot)
+library(GGally)
+library(ggplot2)
+```
+
+Loading the data:
+```{r}
+load("offers_censored.RData")
+source("./helpful_functions.R")
+```
+
+1. Create AppMonth from AppDate
+```{r}
+offers <- offers |>
+  mutate(AppMonth = as.factor(month(AppDate, label=TRUE, abbr=FALSE)))
+str(offers)
+```
+
+2. In recipe for every model: Set AppYear, AppDate, OfferDate, Responsedate to Metadata
+
+
+```{r}
+ years_and_max_dates <- function(x) {
+  x |>
+    group_by(AppYear) |>
+    summarise(
+      `Num observations` = n(),
+      `Max \`AppDate\`` = max(AppDate),
+      `Max \`OfferDate\`` = max(OfferDate),
+      `Max \`ResponseDate\`` = max(ResponseDate, na.rm = TRUE),
+      `\`ResponseDate\` is NA` = sum(is.na(ResponseDate))
+    )
+}
+```
+
+
+Making the splits according to Cesnoring 2 chosen:
+
+```{r}
+final_training_prediction_split <-
+  offers |>
+  filter(AppYear >= 2021) |>
+  make_appyear_split(test_year = 2023)
+
+
+```
+
+The table below confirms that the final training set includes only data from 2021 and 2022, with no censoring:
+
+```{r}
+training(final_training_prediction_split) |> years_and_max_dates()
+```
+Next, create the analysis/assessment split:
+
+```{r}
+analysis_assessment_split <-
+  offers |>
+  # do not include 2020 in the analysis
+  filter(AppYear >= 2021 & AppYear <= 2022) |>
+  censor_post_prediction_responses(years = 2022) |>
+  drop_post_prediction_offers(years = 2022) |>
+  make_appyear_split(test_year = 2022)
+
+```
+
+The table below confirms that the analysis set includes only data from AY2021, and in each year, only contains information available before March 15.
+
+```{r}
+RSM_train <- training(analysis_assessment_split)
+training(analysis_assessment_split) |> years_and_max_dates()
+```
+```{r}
+RSM_test <- testing(analysis_assessment_split)
+testing(analysis_assessment_split) |> years_and_max_dates()
+
+```
+Checking for class imbalance: There is slight class imbalance present, however there are enough observations for the algorithms to be able to distinguish between the two classes. 
+
+```{r}
+RSM_train %>% 
+  count(Status) %>% 
+  mutate(prop = n / sum(n))
+
+
+```
+
+
+## Preparing data for 5-fold CV:
+
+```{r}
+set.seed(616115436) # Call me xoxo
+
+cv_folds <- vfold_cv(RSM_train, v = 5, strata = Status)
+cv_folds
+cv_folds$splits[[1]]
+
+```
+
+## Data exploration:
+
+Here we provide the useful data exploration, however due to choosing CV, we cannot perform feature selection due to risk of introducing bias.
+There are no missing values, except for the ResponseDate variable, which makes sense, as some of the students applying may not have inserted a response at all. 
+
+```{r}
+RSM_train |>
+  skimr::skim()
+
+```
+Here we can see that all programmes have more "Enrolled" students than not enrolled, except for MiM master. 
+```{r}
+RSM_train %>% 
+  ggplot() + aes(Program) +
+  geom_bar(aes(fill = Status), position = "dodge")
+  
+```
+
+Is seems that almost all of the students who have indicated to Accept the offer, indeed enrolled at RSM. Only ~4% who accepted did not enroll. 
+```{r}
+RSM_train %>% 
+  ggplot() + aes(Response) +
+  geom_bar(aes(fill = Status), position = "dodge")
+  
+```
+
+```{r}
+RSM_train %>% 
+  filter(Response == "Accepted") %>% 
+  group_by(Status) %>% 
+  count()
+
+89 / (1955 + 89)
+```
+
+Demo3 variable: 
+```{r}
+RSM_train %>% 
+  ggplot() + aes(Demo3) +
+  geom_bar(aes(fill = Status), position = "dodge")
+
+```
+
+The distribution of the applicaton date is irregular. It seems that the enrlollment patterns come in three waves. 
+```{r}
+RSM_train %>% 
+  ggplot() + aes(AppDate) +
+  geom_histogram(aes(fill = Status)) 
+```
+
+lol
+
